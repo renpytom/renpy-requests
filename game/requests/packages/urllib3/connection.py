@@ -15,14 +15,8 @@ except ImportError:
     from httplib import HTTPConnection as _HTTPConnection
     from httplib import HTTPException  # noqa: unused in this module
 
-try:  # Compiled with SSL?
-    import ssl
-    BaseSSLError = ssl.SSLError
-except (ImportError, AttributeError):  # Platform-specific: No SSL.
-    ssl = None
-
-    class BaseSSLError(BaseException):
-        pass
+import tlslite
+BaseSSLError = tlslite.TLSError
 
 
 try:  # Python 3:
@@ -216,115 +210,21 @@ class HTTPSConnection(HTTPConnection):
         # HTTPS requests to go out as HTTP. (See Issue #356)
         self._protocol = 'https'
 
-    def connect(self):
-        conn = self._new_conn()
-        self._prepare_conn(conn)
-        self.sock = ssl.wrap_socket(conn, self.key_file, self.cert_file)
-
-
-class VerifiedHTTPSConnection(HTTPSConnection):
-    """
-    Based on httplib.HTTPSConnection but wraps the socket with
-    SSL certification.
-    """
-    cert_reqs = None
-    ca_certs = None
-    ca_cert_dir = None
-    ssl_version = None
-    assert_fingerprint = None
-
     def set_cert(self, key_file=None, cert_file=None,
                  cert_reqs=None, ca_certs=None,
                  assert_hostname=None, assert_fingerprint=None,
                  ca_cert_dir=None):
 
-        if (ca_certs or ca_cert_dir) and cert_reqs is None:
-            cert_reqs = 'CERT_REQUIRED'
-
-        self.key_file = key_file
-        self.cert_file = cert_file
-        self.cert_reqs = cert_reqs
-        self.assert_hostname = assert_hostname
-        self.assert_fingerprint = assert_fingerprint
-        self.ca_certs = ca_certs and os.path.expanduser(ca_certs)
-        self.ca_cert_dir = ca_cert_dir and os.path.expanduser(ca_cert_dir)
+        return
 
     def connect(self):
-        # Add certificate verification
         conn = self._new_conn()
+        self._prepare_conn(conn)
 
-        resolved_cert_reqs = resolve_cert_reqs(self.cert_reqs)
-        resolved_ssl_version = resolve_ssl_version(self.ssl_version)
+        self.sock = tlslite.TLSConnection(conn)
+        self.sock.handshakeClientCert()
 
-        hostname = self.host
-        if getattr(self, '_tunnel_host', None):
-            # _tunnel_host was added in Python 2.6.3
-            # (See: http://hg.python.org/cpython/rev/0f57b30a152f)
+        # Not really, but shuts things up.
+        self.is_verified = True
 
-            self.sock = conn
-            # Calls self._set_hostport(), so self.host is
-            # self._tunnel_host below.
-            self._tunnel()
-            # Mark this connection as not reusable
-            self.auto_open = 0
-
-            # Override the host with the one we're requesting data from.
-            hostname = self._tunnel_host
-
-        is_time_off = datetime.date.today() < RECENT_DATE
-        if is_time_off:
-            warnings.warn((
-                'System time is way off (before {0}). This will probably '
-                'lead to SSL verification errors').format(RECENT_DATE),
-                SystemTimeWarning
-            )
-
-        # Wrap socket using verification with the root certs in
-        # trusted_root_certs
-        self.sock = ssl_wrap_socket(conn, self.key_file, self.cert_file,
-                                    cert_reqs=resolved_cert_reqs,
-                                    ca_certs=self.ca_certs,
-                                    ca_cert_dir=self.ca_cert_dir,
-                                    server_hostname=hostname,
-                                    ssl_version=resolved_ssl_version)
-
-        if self.assert_fingerprint:
-            assert_fingerprint(self.sock.getpeercert(binary_form=True),
-                               self.assert_fingerprint)
-        elif resolved_cert_reqs != ssl.CERT_NONE \
-                and self.assert_hostname is not False:
-            cert = self.sock.getpeercert()
-            if not cert.get('subjectAltName', ()):
-                warnings.warn((
-                    'Certificate for {0} has no `subjectAltName`, falling back to check for a '
-                    '`commonName` for now. This feature is being removed by major browsers and '
-                    'deprecated by RFC 2818. (See https://github.com/shazow/urllib3/issues/497 '
-                    'for details.)'.format(hostname)),
-                    SubjectAltNameWarning
-                )
-            _match_hostname(cert, self.assert_hostname or hostname)
-
-        self.is_verified = (resolved_cert_reqs == ssl.CERT_REQUIRED or
-                            self.assert_fingerprint is not None)
-
-
-def _match_hostname(cert, asserted_hostname):
-    try:
-        match_hostname(cert, asserted_hostname)
-    except CertificateError as e:
-        log.error(
-            'Certificate did not match expected hostname: %s. '
-            'Certificate: %s', asserted_hostname, cert
-        )
-        # Add cert to exception and reraise so client code can inspect
-        # the cert when catching the exception, if they want to
-        e._peer_cert = cert
-        raise
-
-
-if ssl:
-    # Make a copy for testing.
-    UnverifiedHTTPSConnection = HTTPSConnection
-    HTTPSConnection = VerifiedHTTPSConnection
-else:
-    HTTPSConnection = DummyConnection
+VerifiedHTTPSConnection = HTTPSConnection
