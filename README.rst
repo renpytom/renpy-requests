@@ -15,8 +15,19 @@ to to send passwords or anything remotely important.
 Using
 -----
 
-Copy the requests and tlslite directories from game/ into your game, then
-do something like::
+Copy the followin files and directories from game/ into your project's
+game directory:
+
+* cgi.py
+* Cookie.py
+* ecdsa/
+* hmac.py
+* Queue.py
+* requests/
+* tlslite/
+* uuid.py
+
+Then add to your script code like::
 
     init python:
         import requests
@@ -34,4 +45,4 @@ do something like::
 
         hide text
 
-        "[response]"
+        "[response.text]"

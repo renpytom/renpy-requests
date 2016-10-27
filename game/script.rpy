@@ -1,7 +1,6 @@
 init python:
-    import sys
-    for i in sorted(sys.modules):
-        print(i)
+    import tlslite
+    import requests
 
 
 label main_menu:
@@ -11,8 +10,18 @@ label main_menu:
 
 ## The game starts here.
 
+
 label start:
 
-    "..."
+    show text "Please wait..."
+    pause 0
 
-    pass
+    python:
+        try:
+            response = requests.get("http://www.renpy.org/")
+        except:
+            response = None
+
+    hide text
+
+    "[response.text]"
