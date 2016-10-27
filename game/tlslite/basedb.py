@@ -1,4 +1,4 @@
-# Authors: 
+# Authors:
 #   Trevor Perrin
 #   Martin von Loewis - python 3 port
 #
@@ -6,14 +6,16 @@
 
 """Base class for SharedKeyDB and VerifierDB."""
 
-try:
-    import anydbm
-except ImportError:
-    # Python 3
-    import dbm as anydbm
+# try:
+#     import anydbm
+# except ImportError:
+#     # Python 3
+#     import dbm as anydbm
 import threading
 
+
 class BaseDB(object):
+
     def __init__(self, filename, type):
         self.type = type
         self.filename = filename
@@ -29,7 +31,7 @@ class BaseDB(object):
         @raise anydbm.error: If there's a problem creating the database.
         """
         if self.filename:
-            self.db = anydbm.open(self.filename, "n") #raises anydbm.error
+            self.db = anydbm.open(self.filename, "n")  # raises anydbm.error
             self.db["--Reserved--type"] = self.type
             self.db.sync()
         else:
@@ -43,7 +45,7 @@ class BaseDB(object):
         """
         if not self.filename:
             raise ValueError("Can only open on-disk databases")
-        self.db = anydbm.open(self.filename, "w") #raises anydbm.error
+        self.db = anydbm.open(self.filename, "w")  # raises anydbm.error
         try:
             if self.db["--Reserved--type"] != self.type:
                 raise ValueError("Not a %s database" % self.type)
